@@ -1,4 +1,4 @@
-# 📚 RAG: FYP Handbook Assistant
+# 📚 GuideGenie: FYP Handbook Assistant
 
 A production-ready, localized Retrieval-Augmented Generation (RAG) pipeline engineered to automate context-aware, zero-hallucination querying over the official FAST-NUCES BS Final Year Project Handbook. The system structures unstructured PDF manuals, matches semantic vectors locally, and generates precise, citation-backed answers with strict grounding constraints.
 
