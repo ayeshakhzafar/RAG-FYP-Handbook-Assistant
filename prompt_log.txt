@@ -1,18 +1,14 @@
-Prompt Log
+======================================================================
+PROMPT LOG: SYSTEM & INFERENCE SPECIFICATIONS
+======================================================================
 
-This file contains the system and inference prompts used in the RAG
-pipeline project.
+SYSTEM CONFIGURATIONS:
+- Embedding Model Pipeline: all-MiniLM-L6-v2 (Sentence-BERT)
+- Vector Store Architecture: Facebook AI Similarity Search (FAISS) Local Index
+- Text Chunking Strategy: 250 words per page block with a 30% sliding window overlap
+- Ingestion Automation: Metadata hashing tracking page allocations and heading titles
 
-System Prompts
-
-
--   Automatic chunking, hashing, and metadata tracking
--   Removal of obsolete chunks when source file is deleted
--   Re-embedding of new files
--   Streamlit single-click login fix
-
-Inference Prompts
-
--   User queries answered using embedded chunks
--   Page-cited responses based on stored metadata
--   Vector search using k-nearest chunks with threshold filtering
+INFERENCE PROMPTS & STRUCTURAL GUARDRAILS:
+- Retrieval Scope: Vector search uses k-nearest match evaluation (k=5).
+- Threshold Filtering Rule: If the maximum Cosine Similarity value drops below 0.25, the system cuts execution loops and returns the standard string fallback: "I don't have that specific rule in the handbook context."
+- Grounding Constraints: Prompt loops force the response engine to answer ONLY using retrieved context strings, appending explicit page references in the format "(p. X)".
