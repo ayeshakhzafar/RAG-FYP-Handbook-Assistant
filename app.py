@@ -1,54 +1,61 @@
+# app.py
 import streamlit as st
 import os
+import faiss
+import numpy as np
+import pickle
+from sentence_transformers import SentenceTransformer
 
-# --- Page Configuration ---
-st.set_page_config(page_title="RAG: FYP Handbook Assistant", page_icon="📚", layout="centered")
-
+st.set_page_config(page_title="RAG: FYP Handbook Assistant", page_icon="📚")
 st.title("🤖 RAG: FYP Handbook Assistant")
-st.write("Ask questions about the FAST-NUCES BS Final Year Project Handbook (2023).")
+st.write("Ask any question regarding the FAST-NUCES BS Final Year Project process.")
 
-# --- Sidebar Configuration ---
-with st.sidebar:
-    st.header("⚙️ Pipeline Configuration")
-    st.info("""
-    - **Model:** all-MiniLM-L6-v2
-    - **Vector Store:** FAISS (Local)
-    - **Chunk Size:** 350 words
-    - **Similarity Threshold:** 0.25
-    """)
+@st.cache_resource
+def load_resources():
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    index = faiss.read_index("faiss_handbook.index")
+    with open("metadata.pkl", "rb") as f:
+        chunks_text, chunks_metadata = pickle.load(f)
+    return model, index, chunks_text, chunks_metadata
 
-# --- Chat Interface ---
-user_question = st.text_input("Enter your query here:", placeholder="e.g., What margins and spacing do we use?")
+# Verify if index files exist on disk before launching the interface
+if not (os.path.exists("faiss_handbook.index") and os.path.exists("metadata.pkl")):
+    st.error("⚠️ Missing Local Databases! Please run 'python ingest.py' in your terminal first to process the PDF.")
+else:
+    model, index, chunks_text, chunks_metadata = load_resources()
 
-if st.button("Ask Assistant"):
-    if user_question.strip() == "":
-        st.warning("Please enter a valid question.")
-    else:
-        # Mocking the pipeline steps for UI demonstration
-        with st.spinner("Embedding query and matching top-K chunks via FAISS..."):
+    with st.sidebar:
+        st.header("⚙️ Pipeline Configuration")
+        st.success("✅ FAISS Database Connected")
+        st.info("Embedding Model:\n`all-MiniLM-L6-v2`\n\nSimilarity Threshold:\n`0.25`\n\nTop-K Matches:\n`5`")
+
+    user_question = st.text_input("Enter your handbook query here:", placeholder="e.g., What margins and spacing do we use?")
+
+    if st.button("Ask Assistant") and user_question.strip():
+        # Embed user input query
+        query_vector = model.encode([user_question])
+        query_vector_np = np.array(query_vector).astype("float32")
+        faiss.normalize_L2(query_vector_np)
+        
+        # Execute k-nearest search via FAISS (k=5)
+        distances, indices = index.search(query_vector_np, k=5)
+        top_score = distances[0][0]
+        
+        # Check strict prompt threshold parameter limit (0.25)
+        if top_score < 0.25:
+            st.error("⚠️ System Guardrail: I don't have that specific rule in the handbook context.")
+        else:
+            st.subheader("📝 Grounded Context Answer")
+            best_idx = indices[0][0]
+            best_meta = chunks_metadata[best_idx]
             
-            # Simulated responses based on the validation test suite
-            q = user_question.lower()
-            if "margin" in q or "spacing" in q:
-                answer = "According to the handbook, the required layouts are: Top margin 1.5\", Bottom 1.0\", Left 2.0\", Right 1.0\". Line spacing must be set to 1.5, and paragraph spacing should be 6 pt."
-                sources = ["Page 12: Formatting Specifications", "Page 13: Layout Constraints"]
-            elif "heading" in q or "font" in q:
-                answer = "The handbook specifies Times New Roman (size 11) for the main body text, and Arial for headings. Specific sizes must be adhered to for Title, H1, H2, and H3 elements."
-                sources = ["Page 11: Typography Guidelines"]
-            elif "chapter" in q or "development" in q:
-                answer = "A Development-based FYP report must contain the following core chapters: Introduction, Research on Existing Products, Vision (Problem, Scope, Stakeholders), SRS, Iterations, Implementation Details, and a User Manual."
-                sources = ["Page 18: Development FYP Report Format"]
-            else:
-                # Simulated threshold guardrail check
-                answer = "I'm sorry, I don't have that specific data in the handbook context. (Similarity score below 0.25 threshold)"
-                sources = []
-
-            # Display Response
-            st.success("### Answer")
-            st.write(answer)
+            # Print the most accurate grounded context paragraph from the PDF
+            st.info(f"**Answer matched from (p. {best_meta['page']}) - Section: {best_meta['section_hint']}:**")
+            st.write(chunks_text[best_idx])
             
-            # Display Sources (Collapsible Debug Tray)
-            if sources:
-                with st.expander("🔍 View Retrieved Sources (Top-K Chunks)"):
-                    for src in sources:
-                        st.markdown(f"- **`{src}`**")
+            # Print the collapsible sources list tracking chunk details
+            with st.expander("🔍 Collapsible Sources Debug Block (Top-K Chunks)"):
+                for score, idx in zip(distances[0], indices[0]):
+                    if idx != -1:
+                        meta = chunks_metadata[idx]
+                        st.markdown(f"- **Page {meta['page']}** ({meta['section_hint']}) — Vector Match Score: `{score:.3f}`")
