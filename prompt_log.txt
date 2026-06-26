@@ -1,0 +1,18 @@
+Prompt Log
+
+This file contains the system and inference prompts used in the RAG
+pipeline project.
+
+System Prompts
+
+
+-   Automatic chunking, hashing, and metadata tracking
+-   Removal of obsolete chunks when source file is deleted
+-   Re-embedding of new files
+-   Streamlit single-click login fix
+
+Inference Prompts
+
+-   User queries answered using embedded chunks
+-   Page-cited responses based on stored metadata
+-   Vector search using k-nearest chunks with threshold filtering
